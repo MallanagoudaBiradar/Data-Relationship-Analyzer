@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI CSV Relationship Analyzer</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better aesthetics and readability */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .container-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        /* Style for the results table */
+        #resultsTable th, #resultsTable td {
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex justify-center items-start">
+
+    <div class="w-full max-w-7xl">
+        <h1 class="text-3xl font-bold text-center text-indigo-700 mb-6">Data Relationship Analyzer</h1>
+
+        <!-- Input and Configuration Card -->
+        <div id="configCard" class="container-card mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">1. Load Data & Select Columns</h2>
+            
+            <div class="flex flex-col md:flex-row gap-6">
+                <!-- File Input -->
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-2" for="csvFile">Upload CSV File</label>
+                    <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-full file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-indigo-50 file:text-indigo-700
+                        hover:file:bg-indigo-100" />
+                    <p id="fileStatus" class="mt-2 text-xs text-gray-500">Awaiting file...</p>
+                </div>
+                
+                <!-- Column 1 Selection -->
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-2" for="col1Select">Column 1 (Source Text)</label>
+                    <select id="col1Select" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500" disabled>
+                        <option value="">-- Load CSV First --</option>
+                    </select>
+                </div>
+                
+                <!-- Column 2 Selection -->
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-2" for="col2Select">Column 2 (Target Text)</label>
+                    <select id="col2Select" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500" disabled>
+                        <option value="">-- Load CSV First --</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Analysis Button -->
+            <button id="analyzeBtn" class="mt-6 w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50 transition duration-150 ease-in-out" disabled onclick="startAnalysis()">
+                Start AI Analysis
+            </button>
+        </div>
+
+        <!-- Loading & Status Indicator -->
+        <div id="statusArea" class="hidden container-card mb-8">
+            <p class="text-lg font-medium text-indigo-600 flex items-center">
+                <svg id="loadingSpinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="display: none;">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="analysisMessage">Analysis in progress...</span>
+            </p>
+            <div id="progressContainer" class="w-full bg-gray-200 rounded-full h-2.5 mt-3">
+                <div id="progressBar" class="bg-indigo-600 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+            <p id="progressDetail" class="text-sm mt-2 text-gray-600">0 / 0 rows analyzed.</p>
+        </div>
+
+
+        <!-- Results Area -->
+        <div id="resultsArea" class="hidden container-card">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700 flex justify-between items-center">
+                Analysis Results
+                <button id="downloadBtn" class="text-sm py-2 px-4 bg-green-500 text-white font-medium rounded-lg shadow-md hover:bg-green-600 disabled:opacity-50 transition duration-150 ease-in-out" onclick="downloadCSV()" disabled>
+                    Download New CSV
+                </button>
+            </h2>
+
+            <div class="overflow-x-auto max-h-96">
+                <table id="resultsTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-indigo-50 sticky top-0">
+                        <!-- Table header will be populated by JS -->
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <!-- Table body will be populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Custom Alert/Modal for errors -->
+        <div id="customAlert" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <h3 id="alertTitle" class="text-lg leading-6 font-medium text-gray-900">Error</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p id="alertMessage" class="text-sm text-gray-500"></p>
+                    </div>
+                    <div class="items-center px-4 py-3">
+                        <button id="alertCloseBtn" class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500" onclick="closeAlert()">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Developer Footer -->
+        <footer class="mt-10 py-6 text-center text-sm text-gray-500 border-t border-gray-200">
+            <p class="font-semibold text-gray-700">Developed by: Mallanagouda R Biradr</p>
+            <p class="mt-1">
+                Portfolio: <a href="https://my-mobile-portfolio.vercel.app/" target="_blank" class="text-indigo-600 hover:text-indigo-800 transition duration-150">https://my-mobile-portfolio.vercel.app/</a>
+            </p>
+            <p>
+                Email: <a href="mailto:mallanagoudarbiradar@gmail.com" class="text-indigo-600 hover:text-indigo-800 transition duration-150">mallanagoudarbiradar@gmail.com</a>
+            </p>
+        </footer>
+
+    </div> 
+    
+    <script>
+        // Global state for application data
+        let csvData = [];
+        let headers = [];
+        let isAnalyzing = false;
+
+        // --- UI Helper Functions ---
+
+        /** Shows a custom alert modal instead of using window.alert() */
+        function showAlert(title, message) {
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertMessage').textContent = message;
+            document.getElementById('customAlert').classList.remove('hidden');
+        }
+
+        /** Closes the custom alert modal. */
+        function closeAlert() {
+            document.getElementById('customAlert').classList.add('hidden');
+        }
+
+        /** Toggles the loading state UI */
+        function setLoadingState(isLoading, message = 'Analysis in progress...') {
+            isAnalyzing = isLoading;
+            const btn = document.getElementById('analyzeBtn');
+            const spinner = document.getElementById('loadingSpinner');
+
+            btn.disabled = isLoading;
+            btn.textContent = isLoading ? 'Processing...' : 'Start AI Analysis';
+            
+            if (isLoading) {
+                document.getElementById('statusArea').classList.remove('hidden');
+                document.getElementById('analysisMessage').textContent = message;
+                spinner.style.display = 'inline-block';
+            } else {
+                document.getElementById('statusArea').classList.add('hidden');
+                spinner.style.display = 'none';
+            }
+        }
+        
+        // --- CSV Handling Functions ---
+
+        /** * Robust CSV parser supporting quotes and commas within fields.
+         * Replaced simple split(',') with a custom logic to handle quoted fields.
+         */
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            if (lines.length === 0) return { headers: [], data: [] };
+
+            // Function to split a line by commas, respecting quoted fields
+            const splitLine = (line) => {
+                const result = [];
+                let currentField = '';
+                let inQuotes = false;
+                
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+
+                    if (char === '"') {
+                        if (inQuotes && i + 1 < line.length && line[i+1] === '"') {
+                            // Escaped quote (double-quote inside quotes)
+                            currentField += '"';
+                            i++; // Skip the next quote
+                        } else {
+                            // Start or end quote
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        // Comma is a separator only outside quotes
+                        result.push(currentField);
+                        currentField = '';
+                    } else {
+                        // Append any other character
+                        currentField += char;
+                    }
+                }
+                result.push(currentField); // Push the last field
+
+                // Clean up: remove surrounding whitespace and outer quotes
+                return result.map(field => field.trim().replace(/^"|"$/g, '').trim());
+            };
+
+            const headers = splitLine(lines[0]);
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = splitLine(lines[i]);
+                
+                // Only process rows where the number of columns matches the header count
+                if (values.length !== headers.length) {
+                    console.warn(`Skipping row ${i + 1} due to column mismatch (Expected: ${headers.length}, Got: ${values.length}).`);
+                    continue; 
+                }
+
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index] || '';
+                });
+                data.push(row);
+            }
+            return { headers, data };
+        }
+
+        /** Handles file selection and populates column dropdowns */
+        document.getElementById('csvFile').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            const fileStatus = document.getElementById('fileStatus');
+            const col1Select = document.getElementById('col1Select');
+            const col2Select = document.getElementById('col2Select');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+
+            if (!file) {
+                fileStatus.textContent = "Awaiting file...";
+                return;
+            }
+
+            fileStatus.textContent = `File loaded: ${file.name}. Reading data...`;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const parsed = parseCSV(e.target.result);
+                headers = parsed.headers;
+                csvData = parsed.data;
+
+                // Clear and populate selects
+                col1Select.innerHTML = '';
+                col2Select.innerHTML = '';
+                
+                const defaultOption = document.createElement('option');
+                defaultOption.value = "";
+                defaultOption.textContent = "-- Select Column --";
+                col1Select.appendChild(defaultOption.cloneNode(true));
+                col2Select.appendChild(defaultOption.cloneNode(true));
+
+                headers.forEach(header => {
+                    const option1 = document.createElement('option');
+                    option1.value = header;
+                    option1.textContent = header;
+                    col1Select.appendChild(option1);
+
+                    const option2 = document.createElement('option');
+                    option2.value = header;
+                    option2.textContent = header;
+                    col2Select.appendChild(option2);
+                });
+
+                // Set default selections (based on the image example)
+                col1Select.value = "Q2: One change that stands out"; // Column J header
+                col2Select.value = "Q4: Plans for next 3-6 months"; // Column L header
+
+                col1Select.disabled = false;
+                col2Select.disabled = false;
+                analyzeBtn.disabled = false;
+                fileStatus.textContent = `${headers.length} columns and ${csvData.length} data rows loaded.`;
+            };
+            reader.readAsText(file);
+        });
+
+        // --- AI Analysis Functions ---
+
+        /** Calls the Gemini API with structured output and exponential backoff. */
+        async function callGeminiWithRetry(payload, maxRetries = 5) {
+            const apiKey = "AIzaSyAmnH33KYn7zwGuJYtaSkMsD1_CaFJsW3s"; // API key will be provided by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (jsonText) {
+                            return JSON.parse(jsonText);
+                        }
+                    }
+                    
+                    // If not ok (e.g., 429 rate limit) or invalid response, trigger retry
+                    throw new Error(`API error (Status: ${response.status}) or invalid response structure.`);
+                } catch (error) {
+                    console.error(`Attempt ${attempt + 1} failed:`, error);
+                    if (attempt === maxRetries - 1) throw error; // Re-throw on last attempt
+
+                    // Exponential backoff with jitter
+                    const delay = Math.pow(2, attempt) * 1000 + Math.floor(Math.random() * 500);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        /** Generates the Gemini API payload for a single row analysis */
+        function generatePayload(textA, textB, colAHeader, colBHeader) {
+            const userQuery = `Analyze the relationship between the following two texts. 
+                Text A (Question: "${colAHeader}"): "${textA}"
+                Text B (Question: "${colBHeader}"): "${textB}"`;
+
+            const systemPrompt = `You are a sophisticated data analyst specialized in comparing textual responses from surveys. 
+                Your task is to analyze Text A and Text B and determine their degree of conceptual relationship, providing a rationale. 
+                Text A is the source (e.g., an observation or a change), and Text B is the target (e.g., a plan or a future action). 
+                The analysis must strictly be a JSON object conforming to the provided schema.
+
+                1. 'related': Boolean (true or false). True if Text A and Text B show a strong, direct thematic, causal, or consequential connection. False otherwise.
+                2. 'relation_percent': An integer percentage (0 to 100) representing the conceptual overlap, dependency, or how much Text A influences Text B.
+                3. 'reason': A concise, professional explanation for your assessment and score, focusing on specific thematic links.`;
+
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    "related": { "type": "BOOLEAN", "description": "True if the texts are strongly related, False otherwise." },
+                    "relation_percent": { "type": "INTEGER", "description": "Percentage (0-100) of conceptual relation." },
+                    "reason": { "type": "STRING", "description": "A concise explanation of the relationship or lack thereof." }
+                },
+                required: ["related", "relation_percent", "reason"],
+                propertyOrdering: ["related", "relation_percent", "reason"]
+            };
+
+            return {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: schema
+                }
+            };
+        }
+
+        /** Main function to orchestrate the analysis */
+        async function startAnalysis() {
+            if (isAnalyzing) return;
+
+            const colAHeader = document.getElementById('col1Select').value;
+            const colBHeader = document.getElementById('col2Select').value;
+
+            if (!colAHeader || !colBHeader) {
+                showAlert("Selection Required", "Please select both Column 1 and Column 2 to begin the analysis.");
+                return;
+            }
+            if (csvData.length === 0) {
+                showAlert("No Data", "Please upload a valid CSV file with data rows first.");
+                return;
+            }
+
+            setLoadingState(true);
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('resultsArea').classList.add('hidden');
+            document.getElementById('resultsTable').querySelector('tbody').innerHTML = '';
+            
+            const totalRows = csvData.length;
+            let analyzedCount = 0;
+            const concurrencyLimit = 5; // Limit concurrent API calls to prevent rate limits
+            const analyzedData = [];
+
+            const processRow = async (rowIndex) => {
+                const row = csvData[rowIndex];
+                const textA = row[colAHeader];
+                const textB = row[colBHeader];
+
+                if (!textA || !textB) {
+                    console.warn(`Skipping row ${rowIndex + 1} due to missing data.`);
+                    return { error: 'Missing data in one or both columns.' };
+                }
+
+                const payload = generatePayload(textA, textB, colAHeader, colBHeader);
+                
+                try {
+                    const result = await callGeminiWithRetry(payload);
+                    analyzedCount++;
+                    document.getElementById('progressDetail').textContent = `${analyzedCount} / ${totalRows} rows analyzed.`;
+                    document.getElementById('progressBar').style.width = `${(analyzedCount / totalRows) * 100}%`;
+                    return result;
+                } catch (error) {
+                    analyzedCount++;
+                    console.error(`Analysis failed for row ${rowIndex + 1}:`, error);
+                    return { 
+                        error: 'AI Analysis Failed. Check console for details.', 
+                        related: false, 
+                        relation_percent: 0, 
+                        reason: 'Analysis failed due to API error or retry exhaustion.' 
+                    };
+                }
+            };
+
+            // Use Promise.all to manage limited concurrency
+            const rowIndexes = Array.from({ length: totalRows }, (_, i) => i);
+            let results = [];
+            
+            while (rowIndexes.length > 0) {
+                const batch = rowIndexes.splice(0, concurrencyLimit);
+                const batchPromises = batch.map(processRow);
+                
+                const batchResults = await Promise.all(batchPromises);
+                results.push(...batchResults);
+                
+                // Update UI after each batch (using analyzedCount for accurate progress)
+                document.getElementById('progressDetail').textContent = `${analyzedCount} / ${totalRows} rows analyzed.`;
+                document.getElementById('progressBar').style.width = `${(analyzedCount / totalRows) * 100}%`;
+            }
+
+
+            // Combine original data with analysis results
+            csvData.forEach((originalRow, index) => {
+                const analysis = results[index] || { related: false, relation_percent: 0, reason: 'No analysis performed.' };
+                
+                analyzedData.push({
+                    ...originalRow,
+                    'AI_Related': analysis.related ? 'True' : 'False',
+                    'AI_Relation_Percent': analysis.relation_percent + '%',
+                    'AI_Reason': analysis.reason
+                });
+            });
+
+            renderResults(analyzedData, colAHeader, colBHeader);
+            setLoadingState(false);
+            document.getElementById('downloadBtn').disabled = false;
+        }
+
+        /** Renders the results table */
+        function renderResults(data, colAHeader, colBHeader) {
+            const tableHead = document.getElementById('resultsTable').querySelector('thead');
+            const tableBody = document.getElementById('resultsTable').querySelector('tbody');
+            
+            // Clear previous results
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            if (data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="99" class="text-center py-4 text-gray-500">No results to display.</td></tr>';
+                return;
+            }
+
+            // Define the three new AI columns
+            const aiHeaders = ['AI_Related', 'AI_Relation_Percent', 'AI_Reason'];
+            
+            // Create the full list of headers for the table
+            const allHeaders = [...headers, ...aiHeaders];
+
+            // Create table header row
+            let headerRow = '<tr>';
+            allHeaders.forEach(h => {
+                let cellClass = 'bg-indigo-200 text-indigo-800';
+                if (h === colAHeader || h === colBHeader) {
+                    cellClass = 'bg-indigo-300 text-indigo-900 font-bold';
+                } else if (aiHeaders.includes(h)) {
+                    cellClass = 'bg-green-100 text-green-700 font-bold';
+                }
+                headerRow += `<th class="${cellClass}">${h.replace('AI_Related', '1. Are they related (T/F)').replace('AI_Relation_Percent', '2. Related (%)').replace('AI_Reason', '3. Reason')}</th>`;
+            });
+            headerRow += '</tr>';
+            tableHead.innerHTML = headerRow;
+
+            // Create table body rows
+            data.forEach(row => {
+                let bodyRow = '<tr>';
+                allHeaders.forEach(h => {
+                    let cellValue = row[h] || '';
+                    let cellClass = 'text-gray-700';
+                    if (aiHeaders.includes(h)) {
+                        cellClass = 'text-green-800 font-medium bg-green-50';
+                    }
+                    if (h === 'AI_Related') {
+                        cellValue = cellValue === 'True' ? '<span class="text-green-600">True</span>' : '<span class="text-red-600">False</span>';
+                    }
+
+                    bodyRow += `<td class="${cellClass}">${cellValue}</td>`;
+                });
+                bodyRow += '</tr>';
+                tableBody.innerHTML += bodyRow;
+            });
+
+            document.getElementById('resultsArea').classList.remove('hidden');
+        }
+
+        // --- CSV Download Function ---
+
+        /** Converts the final data back to a CSV string and triggers download */
+        function downloadCSV() {
+            const table = document.getElementById('resultsTable');
+            let csv = [];
+            
+            // Get Headers
+            const headerRow = Array.from(table.querySelector('thead tr').children)
+                               .map(th => th.textContent.trim().replace('1. Are they related (T/F)', 'AI_Related')
+                                                              .replace('2. Related (%)', 'AI_Relation_Percent')
+                                                              .replace('3. Reason', 'AI_Reason'));
+            csv.push(headerRow.join(','));
+
+            // Get Body Rows
+            Array.from(table.querySelector('tbody').children).forEach(tr => {
+                const row = Array.from(tr.children).map(td => {
+                    // Extract text content, handling HTML spans for True/False
+                    let text = td.textContent.trim();
+                    // Basic quoting for safety, although the initial parser was simple
+                    if (text.includes(',')) {
+                        text = `"${text.replace(/"/g, '""')}"`;
+                    }
+                    return text;
+                });
+                csv.push(row.join(','));
+            });
+
+            const csvString = csv.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", "analyzed_survey_data.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showAlert("Download Complete", "Your augmented CSV file has been prepared and downloaded successfully.");
+        }
+    </script>
+</body>
+</html>
