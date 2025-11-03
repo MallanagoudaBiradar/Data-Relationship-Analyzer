@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI CSV Relationship Analyzer</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom styles for better aesthetics and readability */
@@ -32,12 +31,10 @@
     <div class="w-full max-w-7xl">
         <h1 class="text-3xl font-bold text-center text-indigo-700 mb-6">Data Relationship Analyzer</h1>
 
-        <!-- Input and Configuration Card -->
         <div id="configCard" class="container-card mb-8">
             <h2 class="text-xl font-semibold mb-4 text-gray-700">1. Load Data & Select Columns</h2>
             
             <div class="flex flex-col md:flex-row gap-6">
-                <!-- File Input -->
                 <div class="flex-1">
                     <label class="block text-sm font-medium text-gray-700 mb-2" for="csvFile">Upload CSV File</label>
                     <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-gray-500
@@ -49,7 +46,6 @@
                     <p id="fileStatus" class="mt-2 text-xs text-gray-500">Awaiting file...</p>
                 </div>
                 
-                <!-- Column 1 Selection -->
                 <div class="flex-1">
                     <label class="block text-sm font-medium text-gray-700 mb-2" for="col1Select">Column 1 (Source Text)</label>
                     <select id="col1Select" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500" disabled>
@@ -57,7 +53,6 @@
                     </select>
                 </div>
                 
-                <!-- Column 2 Selection -->
                 <div class="flex-1">
                     <label class="block text-sm font-medium text-gray-700 mb-2" for="col2Select">Column 2 (Target Text)</label>
                     <select id="col2Select" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500" disabled>
@@ -66,13 +61,11 @@
                 </div>
             </div>
 
-            <!-- Analysis Button -->
             <button id="analyzeBtn" class="mt-6 w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50 transition duration-150 ease-in-out" disabled onclick="startAnalysis()">
                 Start AI Analysis
             </button>
         </div>
 
-        <!-- Loading & Status Indicator -->
         <div id="statusArea" class="hidden container-card mb-8">
             <p class="text-lg font-medium text-indigo-600 flex items-center">
                 <svg id="loadingSpinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="display: none;">
@@ -88,7 +81,6 @@
         </div>
 
 
-        <!-- Results Area -->
         <div id="resultsArea" class="hidden container-card">
             <h2 class="text-xl font-semibold mb-4 text-gray-700 flex justify-between items-center">
                 Analysis Results
@@ -100,16 +92,13 @@
             <div class="overflow-x-auto max-h-96">
                 <table id="resultsTable" class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-indigo-50 sticky top-0">
-                        <!-- Table header will be populated by JS -->
-                    </thead>
+                        </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        <!-- Table body will be populated by JS -->
-                    </tbody>
+                        </tbody>
                 </table>
             </div>
         </div>
         
-        <!-- Custom Alert/Modal for errors -->
         <div id="customAlert" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
             <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                 <div class="mt-3 text-center">
@@ -126,7 +115,6 @@
             </div>
         </div>
 
-        <!-- Developer Footer -->
         <footer class="mt-10 py-6 text-center text-sm text-gray-500 border-t border-gray-200">
             <p class="font-semibold text-gray-700">Developed by: Mallanagouda R Biradar</p>
             <p class="mt-1">
@@ -144,6 +132,21 @@
         let csvData = [];
         let headers = [];
         let isAnalyzing = false;
+        
+        // --- API KEY MANAGEMENT (FIXED) ---
+        // IMPORTANT: Replace these placeholder keys with your actual Gemini API keys.
+        const apiKeys = [
+            "AIzaSyB3IlPtYZpK_rMiZBnuCTT-KcN0GuIc4xA", 
+            "AIzaSyDtPVz7o1g4mSa-jYVXF3TK5-o32TaujmM",
+            "AIzaSyAmnH33KYn7zwGuJYtaSkMsD1_CaFJsW3s",
+            "AIzaSyBd6OzEf9lOS4UnuhLrpRBAbuW0lL2bsdM",
+            "AIzaSyBcJHXBYEA6dWUJXnuNgxbnhSbF8i0JN-c" ,
+            "AIzaSyCs4w-NAKY5UC1tgYzfbI5n3MgymoNK2m0",
+            "AIzaSyDzLLaWFnqFPhKSUrVvTYouoT4tz81E6is",
+            "AIzaSyAoX20BktD-c0etWNFIL-p4QPOXyTiQWbM",
+            "AIzaSyCcF_71MNDuzTk36sByubXfNReWYi7bzpo"
+        ];
+        let currentApiKeyIndex = 0; // Tracks the currently active key
 
         // --- UI Helper Functions ---
 
@@ -180,9 +183,7 @@
         
         // --- CSV Handling Functions ---
 
-        /** * Robust CSV parser supporting quotes and commas within fields.
-         * Replaced simple split(',') with a custom logic to handle quoted fields.
-         */
+        /** * Robust CSV parser supporting quotes and commas within fields. */
         function parseCSV(text) {
             const lines = text.trim().split('\n');
             if (lines.length === 0) return { headers: [], data: [] };
@@ -284,9 +285,10 @@
                     col2Select.appendChild(option2);
                 });
 
-                // Set default selections (based on the image example)
-                col1Select.value = "Q2: One change that stands out"; // Column J header
-                col2Select.value = "Q4: Plans for next 3-6 months"; // Column L header
+                // Attempt to set default selections based on image/common headers
+                col1Select.value = headers.includes("Q2: One change that stands out") ? "Q2: One change that stands out" : headers[0] || "";
+                col2Select.value = headers.includes("Q4: Plans for next 3-6 months") ? "Q4: Plans for next 3-6 months" : headers[1] || "";
+
 
                 col1Select.disabled = false;
                 col2Select.disabled = false;
@@ -298,13 +300,19 @@
 
         // --- AI Analysis Functions ---
 
-        /** Calls the Gemini API with structured output and exponential backoff. */
+        /** * Calls the Gemini API with structured output, exponential backoff, and API key rotation. 
+         * (FIXED: Added key rotation logic)
+         */
         async function callGeminiWithRetry(payload, maxRetries = 5) {
-            const apiKey = "AIzaSyAmnH33KYn7zwGuJYtaSkMsD1_CaFJsW3s"; // API key will be provided by the environment
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
+            
             for (let attempt = 0; attempt < maxRetries; attempt++) {
+                
+                const apiKey = apiKeys[currentApiKeyIndex];
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
                 try {
+                    // console.log(`Attempt ${attempt + 1}: Using key index ${currentApiKeyIndex} for request.`);
+
                     const response = await fetch(apiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -319,11 +327,20 @@
                         }
                     }
                     
-                    // If not ok (e.g., 429 rate limit) or invalid response, trigger retry
+                    // If not ok (e.g., 429 rate limit, 403 invalid key, 500 server error)
                     throw new Error(`API error (Status: ${response.status}) or invalid response structure.`);
+                    
                 } catch (error) {
-                    console.error(`Attempt ${attempt + 1} failed:`, error);
-                    if (attempt === maxRetries - 1) throw error; // Re-throw on last attempt
+                    console.error(`Request failed on key index ${currentApiKeyIndex}, Attempt ${attempt + 1}:`, error.message);
+                    
+                    // --- KEY ROTATION LOGIC ---
+                    // Rotate the key before the next retry (if there is one)
+                    currentApiKeyIndex = (currentApiKeyIndex + 1) % apiKeys.length;
+                    console.log(`Key rotated. New key index: ${currentApiKeyIndex}`);
+
+                    if (attempt === maxRetries - 1) {
+                        throw new Error("Analysis failed due to API error or retry exhaustion across all keys."); // Re-throw on last attempt
+                    }
 
                     // Exponential backoff with jitter
                     const delay = Math.pow(2, attempt) * 1000 + Math.floor(Math.random() * 500);
@@ -371,6 +388,11 @@
         /** Main function to orchestrate the analysis */
         async function startAnalysis() {
             if (isAnalyzing) return;
+            
+            if (apiKeys.length === 0) {
+                showAlert("API Key Error", "Please provide at least one API key in the 'apiKeys' array in the script.");
+                return;
+            }
 
             const colAHeader = document.getElementById('col1Select').value;
             const colBHeader = document.getElementById('col2Select').value;
@@ -391,8 +413,13 @@
             
             const totalRows = csvData.length;
             let analyzedCount = 0;
-            const concurrencyLimit = 5; // Limit concurrent API calls to prevent rate limits
+            const concurrencyLimit = 5; // Limit concurrent API calls
             const analyzedData = [];
+
+            const updateProgress = () => {
+                document.getElementById('progressDetail').textContent = `${analyzedCount} / ${totalRows} rows analyzed.`;
+                document.getElementById('progressBar').style.width = `${(analyzedCount / totalRows) * 100}%`;
+            };
 
             const processRow = async (rowIndex) => {
                 const row = csvData[rowIndex];
@@ -401,6 +428,7 @@
 
                 if (!textA || !textB) {
                     console.warn(`Skipping row ${rowIndex + 1} due to missing data.`);
+                    analyzedCount++;
                     return { error: 'Missing data in one or both columns.' };
                 }
 
@@ -409,18 +437,18 @@
                 try {
                     const result = await callGeminiWithRetry(payload);
                     analyzedCount++;
-                    document.getElementById('progressDetail').textContent = `${analyzedCount} / ${totalRows} rows analyzed.`;
-                    document.getElementById('progressBar').style.width = `${(analyzedCount / totalRows) * 100}%`;
                     return result;
                 } catch (error) {
                     analyzedCount++;
-                    console.error(`Analysis failed for row ${rowIndex + 1}:`, error);
+                    console.error(`Final analysis failed for row ${rowIndex + 1}:`, error);
                     return { 
                         error: 'AI Analysis Failed. Check console for details.', 
                         related: false, 
                         relation_percent: 0, 
                         reason: 'Analysis failed due to API error or retry exhaustion.' 
                     };
+                } finally {
+                    updateProgress();
                 }
             };
 
@@ -432,19 +460,44 @@
                 const batch = rowIndexes.splice(0, concurrencyLimit);
                 const batchPromises = batch.map(processRow);
                 
+                // Wait for the current batch to complete
                 const batchResults = await Promise.all(batchPromises);
                 results.push(...batchResults);
                 
-                // Update UI after each batch (using analyzedCount for accurate progress)
-                document.getElementById('progressDetail').textContent = `${analyzedCount} / ${totalRows} rows analyzed.`;
-                document.getElementById('progressBar').style.width = `${(analyzedCount / totalRows) * 100}%`;
+                // A brief pause between batches helps mitigate rate limiting even with key rotation
+                await new Promise(resolve => setTimeout(resolve, 500)); 
             }
 
-
-            // Combine original data with analysis results
+            // Combine original data with analysis results (FIXED: Logic to enforce 0% and non-empty reason)
             csvData.forEach((originalRow, index) => {
-                const analysis = results[index] || { related: false, relation_percent: 0, reason: 'No analysis performed.' };
+                let analysis = results[index] || { related: false, relation_percent: 0, reason: 'No analysis performed.' };
                 
+                // --- MODIFIED LOGIC START: Ensure 0% for FALSE and provide a reason ---
+                
+                // 1. If analysis is explicitly not related, ensure the percentage is 0
+                if (analysis.related === false) {
+                    analysis.relation_percent = 0;
+                }
+                
+                // 2. If relation is 0, ensure a non-empty, professional reason
+                if (analysis.relation_percent === 0) {
+                    const defaultReason = "The texts show no significant conceptual, causal, or thematic overlap (0% relation).";
+                    
+                    // Use the AI's reason if it's there and meaningful, otherwise use the default
+                    analysis.reason = analysis.reason && analysis.reason !== 'No analysis performed.' 
+                        ? analysis.reason 
+                        : defaultReason;
+                }
+                
+                // 3. Handle data integrity issues (e.g., if the analysis failed completely)
+                if (analysis.error) {
+                    analysis.related = false;
+                    analysis.relation_percent = 0;
+                    analysis.reason = analysis.error;
+                }
+                
+                // --- MODIFIED LOGIC END ---
+
                 analyzedData.push({
                     ...originalRow,
                     'AI_Related': analysis.related ? 'True' : 'False',
@@ -533,8 +586,13 @@
                 const row = Array.from(tr.children).map(td => {
                     // Extract text content, handling HTML spans for True/False
                     let text = td.textContent.trim();
-                    // Basic quoting for safety, although the initial parser was simple
-                    if (text.includes(',')) {
+                    // Replace the HTML span content with the raw True/False string for the CSV
+                    if (td.querySelector('span')) {
+                        text = td.querySelector('span').textContent.trim();
+                    }
+
+                    // Basic quoting for safety, escaping double quotes within the field
+                    if (text.includes(',') || text.includes('"') || text.includes('\n')) {
                         text = `"${text.replace(/"/g, '""')}"`;
                     }
                     return text;
