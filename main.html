@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI CSV Relationship Analyzer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
     <style>
         /* Custom styles for better aesthetics and readability */
         body {
@@ -140,11 +141,13 @@
             "AIzaSyDtPVz7o1g4mSa-jYVXF3TK5-o32TaujmM",
             "AIzaSyAmnH33KYn7zwGuJYtaSkMsD1_CaFJsW3s",
             "AIzaSyBd6OzEf9lOS4UnuhLrpRBAbuW0lL2bsdM",
-            "AIzaSyBcJHXBYEA6dWUJXnuNgxbnhSbF8i0JN-c" ,
+            "AIzaSyBcJHXBYEA6dWUJXnuNgxbnhSbF8i0JN-c",
             "AIzaSyCs4w-NAKY5UC1tgYzfbI5n3MgymoNK2m0",
             "AIzaSyDzLLaWFnqFPhKSUrVvTYouoT4tz81E6is",
             "AIzaSyAoX20BktD-c0etWNFIL-p4QPOXyTiQWbM",
-            "AIzaSyCcF_71MNDuzTk36sByubXfNReWYi7bzpo"
+            "AIzaSyCcF_71MNDuzTk36sByubXfNReWYi7bzpo",
+            "AIzaSyChwpNYh5NFCD9spq0m-_g4_OoUFIPmR4U",
+            "AIzaSyBZuLGk5p0zg04B8sjNCIhpJx3a7Vy3mLc"
         ];
         let currentApiKeyIndex = 0; // Tracks the currently active key
 
@@ -181,68 +184,9 @@
             }
         }
         
-        // --- CSV Handling Functions ---
+        // --- CSV Handling Functions (Using Papa Parse) ---
 
-        /** * Robust CSV parser supporting quotes and commas within fields. */
-        function parseCSV(text) {
-            const lines = text.trim().split('\n');
-            if (lines.length === 0) return { headers: [], data: [] };
-
-            // Function to split a line by commas, respecting quoted fields
-            const splitLine = (line) => {
-                const result = [];
-                let currentField = '';
-                let inQuotes = false;
-                
-                for (let i = 0; i < line.length; i++) {
-                    const char = line[i];
-
-                    if (char === '"') {
-                        if (inQuotes && i + 1 < line.length && line[i+1] === '"') {
-                            // Escaped quote (double-quote inside quotes)
-                            currentField += '"';
-                            i++; // Skip the next quote
-                        } else {
-                            // Start or end quote
-                            inQuotes = !inQuotes;
-                        }
-                    } else if (char === ',' && !inQuotes) {
-                        // Comma is a separator only outside quotes
-                        result.push(currentField);
-                        currentField = '';
-                    } else {
-                        // Append any other character
-                        currentField += char;
-                    }
-                }
-                result.push(currentField); // Push the last field
-
-                // Clean up: remove surrounding whitespace and outer quotes
-                return result.map(field => field.trim().replace(/^"|"$/g, '').trim());
-            };
-
-            const headers = splitLine(lines[0]);
-            const data = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const values = splitLine(lines[i]);
-                
-                // Only process rows where the number of columns matches the header count
-                if (values.length !== headers.length) {
-                    console.warn(`Skipping row ${i + 1} due to column mismatch (Expected: ${headers.length}, Got: ${values.length}).`);
-                    continue; 
-                }
-
-                const row = {};
-                headers.forEach((header, index) => {
-                    row[header] = values[index] || '';
-                });
-                data.push(row);
-            }
-            return { headers, data };
-        }
-
-        /** Handles file selection and populates column dropdowns */
+        /** Handles file selection and populates column dropdowns using Papa Parse */
         document.getElementById('csvFile').addEventListener('change', (event) => {
             const file = event.target.files[0];
             const fileStatus = document.getElementById('fileStatus');
@@ -255,47 +199,76 @@
                 return;
             }
 
-            fileStatus.textContent = `File loaded: ${file.name}. Reading data...`;
-            
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const parsed = parseCSV(e.target.result);
-                headers = parsed.headers;
-                csvData = parsed.data;
+            fileStatus.textContent = `File loaded: ${file.name}. Parsing data with Papa Parse...`;
+            analyzeBtn.disabled = true;
 
-                // Clear and populate selects
-                col1Select.innerHTML = '';
-                col2Select.innerHTML = '';
-                
-                const defaultOption = document.createElement('option');
-                defaultOption.value = "";
-                defaultOption.textContent = "-- Select Column --";
-                col1Select.appendChild(defaultOption.cloneNode(true));
-                col2Select.appendChild(defaultOption.cloneNode(true));
+            // Use Papa Parse for robust parsing
+            Papa.parse(file, {
+                header: true, // Use the first row as column headers
+                skipEmptyLines: true, // Crucial for cleaning up spreadsheet exports
+                complete: function(results) {
+                    if (results.errors.length > 0) {
+                        console.error("Papa Parse Errors:", results.errors);
+                        // Show a warning but proceed
+                        // showAlert("Parsing Warning", `Found ${results.errors.length} parsing errors. Data integrity might be compromised. See console for details.`);
+                    }
 
-                headers.forEach(header => {
-                    const option1 = document.createElement('option');
-                    option1.value = header;
-                    option1.textContent = header;
-                    col1Select.appendChild(option1);
+                    // Get headers from the results meta data
+                    headers = results.meta.fields || []; 
+                    
+                    // Filter out rows where all values are null/empty/undefined
+                    csvData = results.data.filter(row => {
+                        if (!row) return false;
+                        // Check if at least one value in the row is non-empty/non-null
+                        return Object.values(row).some(v => v !== null && v !== undefined && String(v).trim() !== '');
+                    });
 
-                    const option2 = document.createElement('option');
-                    option2.value = header;
-                    option2.textContent = header;
-                    col2Select.appendChild(option2);
-                });
+                    // Clear and populate selects
+                    col1Select.innerHTML = '';
+                    col2Select.innerHTML = '';
+                    
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = "";
+                    defaultOption.textContent = "-- Select Column --";
+                    col1Select.appendChild(defaultOption.cloneNode(true));
+                    col2Select.appendChild(defaultOption.cloneNode(true));
 
-                // Attempt to set default selections based on image/common headers
-                col1Select.value = headers.includes("Q2: One change that stands out") ? "Q2: One change that stands out" : headers[0] || "";
-                col2Select.value = headers.includes("Q4: Plans for next 3-6 months") ? "Q4: Plans for next 3-6 months" : headers[1] || "";
+                    headers.forEach(header => {
+                        // Ensure header is not null/empty (can happen with trailing commas)
+                        if (header && header.trim()) { 
+                            const option1 = document.createElement('option');
+                            option1.value = header;
+                            option1.textContent = header;
+                            col1Select.appendChild(option1);
 
+                            const option2 = document.createElement('option');
+                            option2.value = header;
+                            option2.textContent = header;
+                            col2Select.appendChild(option2);
+                        }
+                    });
 
-                col1Select.disabled = false;
-                col2Select.disabled = false;
-                analyzeBtn.disabled = false;
-                fileStatus.textContent = `${headers.length} columns and ${csvData.length} data rows loaded.`;
-            };
-            reader.readAsText(file);
+                    // Attempt to set default selections based on common headers
+                    const defaultColA = "Q2: Can you tell us about one change in your school that is close to you? How did you make it happen?";
+                    const defaultColB = "Q4: In the next 3–6 months, what is your plan for this change?";
+                    
+                    col1Select.value = headers.includes(defaultColA) ? defaultColA : headers[0] || "";
+                    col2Select.value = headers.includes(defaultColB) ? defaultColB : headers[1] || "";
+
+                    col1Select.disabled = false;
+                    col2Select.disabled = false;
+                    analyzeBtn.disabled = (csvData.length === 0);
+                    fileStatus.textContent = `${headers.length} columns and ${csvData.length} data rows loaded.`;
+
+                    if (csvData.length === 0) {
+                        showAlert("Data Load Warning", "No valid data rows were found. Check your CSV file format.");
+                    }
+                },
+                error: function(err) {
+                    console.error("Papa Parse Fatal Error:", err);
+                    showAlert("Fatal Parsing Error", `An unrecoverable error occurred while reading the file: ${err.message}`);
+                }
+            });
         });
 
         // --- AI Analysis Functions ---
@@ -426,10 +399,18 @@
                 const textA = row[colAHeader];
                 const textB = row[colBHeader];
 
-                if (!textA || !textB) {
+                // Check for null or purely empty/whitespace strings
+                const isDataMissing = !textA || !textB || String(textA).trim() === '' || String(textB).trim() === '';
+
+                if (isDataMissing) {
                     console.warn(`Skipping row ${rowIndex + 1} due to missing data.`);
                     analyzedCount++;
-                    return { error: 'Missing data in one or both columns.' };
+                    updateProgress();
+                    return { 
+                        related: false, 
+                        relation_percent: 0, 
+                        reason: 'Skipped: One or both texts were empty/missing.' 
+                    };
                 }
 
                 const payload = generatePayload(textA, textB, colAHeader, colBHeader);
@@ -468,11 +449,11 @@
                 await new Promise(resolve => setTimeout(resolve, 500)); 
             }
 
-            // Combine original data with analysis results (FIXED: Logic to enforce 0% and non-empty reason)
+            // Combine original data with analysis results 
             csvData.forEach((originalRow, index) => {
                 let analysis = results[index] || { related: false, relation_percent: 0, reason: 'No analysis performed.' };
                 
-                // --- MODIFIED LOGIC START: Ensure 0% for FALSE and provide a reason ---
+                // --- Logic to ensure data integrity and 0% for FALSE ---
                 
                 // 1. If analysis is explicitly not related, ensure the percentage is 0
                 if (analysis.related === false) {
@@ -483,7 +464,6 @@
                 if (analysis.relation_percent === 0) {
                     const defaultReason = "The texts show no significant conceptual, causal, or thematic overlap (0% relation).";
                     
-                    // Use the AI's reason if it's there and meaningful, otherwise use the default
                     analysis.reason = analysis.reason && analysis.reason !== 'No analysis performed.' 
                         ? analysis.reason 
                         : defaultReason;
@@ -496,7 +476,7 @@
                     analysis.reason = analysis.error;
                 }
                 
-                // --- MODIFIED LOGIC END ---
+                // --- END Logic ---
 
                 analyzedData.push({
                     ...originalRow,
@@ -554,8 +534,13 @@
                     if (aiHeaders.includes(h)) {
                         cellClass = 'text-green-800 font-medium bg-green-50';
                     }
+                    
+                    // Handle True/False display with colors
                     if (h === 'AI_Related') {
-                        cellValue = cellValue === 'True' ? '<span class="text-green-600">True</span>' : '<span class="text-red-600">False</span>';
+                        const rawValue = row[h] ? row[h].trim() : ''; 
+                        cellValue = rawValue === 'True' ? '<span class="text-green-600">True</span>' : '<span class="text-red-600">False</span>';
+                    } else {
+                        cellValue = row[h] || '';
                     }
 
                     bodyRow += `<td class="${cellClass}">${cellValue}</td>`;
@@ -570,43 +555,42 @@
         // --- CSV Download Function ---
 
         /** Converts the final data back to a CSV string and triggers download 
-         * (FIXED: Uses selected column names for the filename)
+         * FIX: Uses Papa Parse's unparse for guaranteed correct CSV generation
         */
         function downloadCSV() {
             const table = document.getElementById('resultsTable');
-            let csv = [];
             
-            // Get Headers
-            const headerRow = Array.from(table.querySelector('thead tr').children)
+            // 1. Collect the final headers in the displayed order
+            const allHeaders = Array.from(table.querySelector('thead tr').children)
                                .map(th => th.textContent.trim().replace('1. Are they related (T/F)', 'AI_Related')
                                                               .replace('2. Related (%)', 'AI_Relation_Percent')
                                                               .replace('3. Reason', 'AI_Reason'));
-            csv.push(headerRow.join(','));
 
-            // Get Body Rows
-            Array.from(table.querySelector('tbody').children).forEach(tr => {
-                const row = Array.from(tr.children).map(td => {
+            // 2. Collect the data rows as an array of arrays, maintaining order
+            const dataRows = Array.from(table.querySelector('tbody').children).map(tr => {
+                return Array.from(tr.children).map(td => {
                     // Extract text content, handling HTML spans for True/False
-                    let text = td.textContent.trim();
-                    // Replace the HTML span content with the raw True/False string for the CSV
-                    if (td.querySelector('span')) {
-                        text = td.querySelector('span').textContent.trim();
-                    }
-
-                    // Basic quoting for safety, escaping double quotes within the field
-                    if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-                        text = `"${text.replace(/"/g, '""')}"`;
+                    let text;
+                    const span = td.querySelector('span');
+                    if (span) {
+                        text = span.textContent.trim(); // Raw 'True' or 'False'
+                    } else {
+                        text = td.textContent.trim();
                     }
                     return text;
                 });
-                csv.push(row.join(','));
+            });
+
+            // 3. Use Papa Parse's unparse function for robust CSV generation
+            const csvString = Papa.unparse({
+                fields: allHeaders, // This ensures the order of columns
+                data: dataRows
             });
 
             // --- DYNAMIC FILENAME GENERATION START ---
             const colAHeader = document.getElementById('col1Select').value;
             const colBHeader = document.getElementById('col2Select').value;
             
-            // Sanitize headers to be filename-safe: remove non-alphanumeric/spaces, replace with underscore, and truncate.
             const sanitize = (header) => header.replace(/[^a-zA-Z0-9]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '').substring(0, 40);
             
             const fileSafeHeader1 = sanitize(colAHeader);
@@ -616,13 +600,12 @@
             // --- DYNAMIC FILENAME GENERATION END ---
 
 
-            const csvString = csv.join('\n');
             const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
             
             link.setAttribute("href", url);
-            link.setAttribute("download", newFileName); // <-- Uses the new dynamic filename
+            link.setAttribute("download", newFileName); 
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
